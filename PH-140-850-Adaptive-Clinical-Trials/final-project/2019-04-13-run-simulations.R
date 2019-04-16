@@ -20,7 +20,7 @@ out.df.path   <- file.path(project.dir, "results/out_df.csv")
 ## sample size n 
 get.nn.replace <- FALSE
 ## power, expected # of failures 
-sim.replace <- TRUE
+sim.replace <- FALSE
 
 ## Simulation repetition number  
 get.nn.rep.N <- 10000
@@ -244,6 +244,8 @@ get.droploser <- function(p_a, p_b, nn){
 ## -----------------------------------------------------------------------------
 ## SIMULATE RESULT: power, expected # of failures 
 
+error.obj <- list(power = NA, failures = NA)
+set.seed(1)
 if (sim.replace){
   ## objects to store simulation results
   out.row_i   <- numeric()
@@ -261,35 +263,20 @@ if (sim.replace){
     nn  <- vec.i[3]
     for (j in 1:sim.rep.N){
       print(j)
-      tryCatch({
-        ## Get power, expected # of failures for one experiment (one trial) repetition
-        out1         <- get.compl(p_a, p_b, nn)
-        out2         <- get.playwin(p_a, p_b, nn)
-        out3         <- get.droploser(p_a, p_b, nn)
-        ## Save simulation results
-        ## complete 
-        out.power    <- c(out.power, out1$power)
-        out.failures <- c(out.failures, out1$failures)
-        out.method   <- c(out.method, "complete")
-        ## play_winner_rule
-        out.power    <- c(out.power, out2$power)
-        out.failures <- c(out.failures, out2$failures)
-        out.method   <- c(out.method, "play_winner_rule")
-        ## drop_loser_rule
-        out.power    <- c(out.power, out3$power)
-        out.failures <- c(out.failures, out3$failures)
-        out.method   <- c(out.method, "drop_loser_rule")
-      }, error = function(e) {
-        message(e)
-        out.power    <- c(out.power, rep(NA, 3))
-        out.failures <- c(out.failures, rep(NA, 3))
-        out.method   <- c(out.method, c("complete", "play_winner_rule", "drop_loser_rule"))
-      })
+      ## Simulate trial 
+      out1 <- tryCatch({ get.compl(p_a, p_b, nn)     }, error = function(e) { error.obj }) 
+      out2 <- tryCatch({ get.playwin(p_a, p_b, nn)   }, error = function(e) { error.obj }) 
+      out3 <- tryCatch({ get.droploser(p_a, p_b, nn) }, error = function(e) { error.obj }) 
+      ## Save simulation results 
+      out.power    <- c(out.power, c(out1$power, out2$power, out3$power))
+      out.failures <- c(out.failures, c(out1$failures, out2$failures, out3$failures))
+      out.method   <- c(out.method, c("complete", "play_winner_rule", "drop_loser_rule"))
     }
     out.p_a   <- c(out.p_a, rep(p_a, 3 * sim.rep.N))
     out.p_b   <- c(out.p_b, rep(p_b, 3 * sim.rep.N))
     out.nn    <- c(out.nn,  rep(nn, 3 * sim.rep.N))
     out.row_i <- c(out.row_i, rep(row.i, 3 * sim.rep.N))
+    if (length(out.power) != length(out.row_i)) stop("length(out.power) != length(out.row_i)")
   }
   
   ## Save results to data frame, write to file 
@@ -319,26 +306,29 @@ param.df
 out.df
 
 any(is.na(out.df))
+sum(is.na(out.df$failures))
 
 ## Aggregate results data frame
 out.df.agg <- 
   out.df %>%
   group_by(row_i, p_a, p_b, nn, method) %>%
-  summarize(power_mean = mean(power),
-            power_sd = sd(power),
-            failures_mean = mean(failures),
-            failures_sd = sd(failures),
-            n = n()) %>%
-  mutate(setting = paste0("P_a=", p_a, ", P_b=", p_b, ", n=", n),
+  mutate(valid_obs = !is.na(power)) %>%
+  summarize(power_mean = mean(power, na.rm = TRUE),
+            power_sd = sd(power, na.rm = TRUE),
+            failures_mean = mean(failures, na.rm = TRUE),
+            failures_sd = sd(failures, na.rm = TRUE),
+            n_valid_obs = sum(valid_obs)) %>%
+  mutate(setting = paste0("P_a=", p_a, ", P_b=", p_b, ", n=", nn),
          # power_mean_err    = qt(0.975, df = 10000 - 1) * power_sd / sqrt(10000),
          # failures_mean_err = qt(0.975, df = 10000 - 1) * failures_sd / sqrt(10000),
-         power_mean_err    = qnorm(0.975) * power_sd / sqrt(10000),
-         failures_mean_err = qnorm(0.975) * failures_sd / sqrt(10000),
+         power_mean_err    = qnorm(0.975) * power_sd / sqrt(n_valid_obs),
+         failures_mean_err = qnorm(0.975) * failures_sd / sqrt(n_valid_obs),
          power_mean_bar_UL = power_mean + power_mean_err,
          power_mean_bar_LL = power_mean - power_mean_err,
          failures_mean_bar_UL = failures_mean + failures_mean_err,
          failures_mean_bar_LL = failures_mean - failures_mean_err) %>%
-  arrange(method, row_i) 
+  arrange(method, row_i) %>%
+  as.data.frame()
 out.df.agg$setting <- factor(as.character(out.df.agg$setting))
 out.df.agg$method <- factor(
   as.character(out.df.agg$method),
@@ -349,14 +339,16 @@ out.df.agg$method <- factor(
 ## Plot power 
 ggplot(out.df.agg, 
        aes(x = method, y = power_mean, color = method, group = method)) +
+  geom_hline(yintercept = 0.9, size = 0.2) + 
   geom_line(data = out.df.agg, 
             aes(x = method, y = power_mean, group = 1),
             inherit.aes = FALSE) + 
   geom_point(size = 3) + 
   geom_errorbar(aes(ymin = power_mean_bar_LL, ymax = power_mean_bar_UL),
                  width=.2) + 
-  facet_wrap(~ setting, scales = "free") + 
+  facet_wrap(~ setting, scales = "free", ncol = 3) + 
   theme_bw(base_size = 10) + 
+  scale_y_continuous(limits = c(0.875, 0.926)) + 
   # theme(legend.position = "none") + 
   labs(x = "Method", 
        y = "Proportion of rejected nulls:\nbinomial mean and 95% CI of the mean bars",
@@ -375,7 +367,7 @@ ggplot(out.df.agg,
   geom_point(size = 3) + 
   geom_errorbar(aes(ymin = failures_mean_bar_LL, ymax = failures_mean_bar_UL),
                 width=.2) + 
-  facet_wrap(~ setting, scales = "free") + 
+  facet_wrap(~ setting, scales = "free", ncol = 3) + 
   theme_bw(base_size = 10) + 
   # theme(legend.position = "none") + 
   labs(x = "Method", 
