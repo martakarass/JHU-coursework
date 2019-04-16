@@ -130,12 +130,6 @@ get.playwin <- function(p_a, p_b, nn){
     ## Determine treatment type based on this iteration urn draw
     pr.draw.A <- balls.A / (balls.A + balls.B)
     is.draw.A <- as.logical(rbinom(1, 1, pr.draw.A))
-    # ## Update urn count after this iteration urn draw, after the draw
-    # if (is.draw.A) {
-    #   balls.A <- balls.A - 1
-    # } else {
-    #   balls.B <- balls.B - 1
-    # }
     ## Simulate whether or not treatment is successful
     pr.draw.success <- ifelse(is.draw.A, p_a, p_b)
     draw.success <- as.logical(rbinom(1, 1, pr.draw.success))
