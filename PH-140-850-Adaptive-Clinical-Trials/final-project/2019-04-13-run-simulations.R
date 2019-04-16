@@ -313,8 +313,6 @@ out.df.agg <-
             failures_sd = sd(failures, na.rm = TRUE),
             n_valid_obs = sum(valid_obs)) %>%
   mutate(setting = paste0("P_a=", p_a, ", P_b=", p_b, ", n=", nn),
-         # power_mean_err    = qt(0.975, df = 10000 - 1) * power_sd / sqrt(10000),
-         # failures_mean_err = qt(0.975, df = 10000 - 1) * failures_sd / sqrt(10000),
          power_mean_err    = qnorm(0.975) * power_sd / sqrt(n_valid_obs),
          failures_mean_err = qnorm(0.975) * failures_sd / sqrt(n_valid_obs),
          power_mean_bar_UL = power_mean + power_mean_err,
