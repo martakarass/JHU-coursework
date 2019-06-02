@@ -71,7 +71,7 @@ theme_Publication <- function(base_size = 13, base_family = "Helvetica") {
       plot.margin = unit(c(10, 5, 5, 5), "mm"),
       strip.background = element_rect(colour = "#f0f0f0", fill = "#f0f0f0"),
       strip.text = element_text(face = "bold")
-    )
+    ) 
 }
 
 
@@ -124,6 +124,43 @@ cbp1 <- c("#999999", "#E69F00", "#56B4E9", "#009E73",
 # The colorblind-friendly palette with black:
 cbp2 <- c("#000000", "#E69F00", "#56B4E9", "#009E73",
           "#F0E442", "#0072B2", "#D55E00", "#CC79A7")
+
+
+
+#' Based on: 
+#' https://stackoverflow.com/questions/50227916/adding-counts-to-ggmosaic-can-this-be-done-simpler
+#' 
+plt.mosaic <- function(data, 
+                       xcol, fillcol, cntcol, 
+                       xcol.lab, fillcol.lab){
+  names(data)[which(names(data) == xcol)] <- "a"
+  names(data)[which(names(data) == fillcol)] <- "b"
+  names(data)[which(names(data) == cntcol)] <- "n"
+  data %>%
+    group_by(a) %>%
+    mutate(x.width = sum(n),
+           n = round(n)) %>%
+    # Simulate mosaic plot
+    ggplot(aes(x = factor(a), y = n)) +
+    geom_col(aes(width = x.width, fill = factor(b)),
+             colour = "white", 
+             size = 1, 
+             position = position_fill(reverse = TRUE)) +
+    geom_label(aes(label = n),
+               position = position_fill(vjust = 0.5)) +
+    facet_grid(~ a, space = "free", scales = "free", switch = "x") +
+    # Cosmetic tweaks
+    scale_y_continuous(labels = scales::percent) +
+    theme_minimal() + 
+    theme(axis.text.x = element_blank(),
+          axis.ticks.x = element_blank(),
+          axis.title.y = element_blank(),
+          strip.background = element_blank(),
+          panel.spacing = unit(0, "pt")) + 
+    labs(x = xcol.lab, fill = fillcol.lab)
+}
+
+
 
 
 
