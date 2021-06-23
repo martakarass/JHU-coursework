@@ -12,7 +12,7 @@ rm(list = ls())
 library(dplyr)
 library(ggplot2)
 
-project.dir   <- "/Users/martakaras/Dropbox/JHU-coursework/PH-140-850-Adaptive-Clinical-Trials/final-project/"
+project.dir   <- "/Users/martakaras/Dropbox/JHU-coursework/850-Adaptive-Clinical-Trials/final-project/"
 param.df.path <- file.path(project.dir, "results/param_df.csv")
 out.df.path   <- file.path(project.dir, "results/out_df.csv")
 

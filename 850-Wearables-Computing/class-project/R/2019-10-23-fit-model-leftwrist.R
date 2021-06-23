@@ -12,14 +12,13 @@
 
 rm(list = ls())
 
-project.dir   <- "/Users/martakaras/Dropbox/JHU-coursework/PH-140-850-Wearables-Computing/class-project/"
+project.dir   <- "/Users/martakaras/Dropbox/JHU-coursework/850-Wearables-Computing/class-project/"
 
 library(adeptdata)
 library(keras)
-library(dplyr)
 library(ggplot2)
-
-
+library(reshape2)
+library(dplyr)
 
 ## -----------------------------------------------------------------------------
 ## PREPARE DATA
@@ -41,7 +40,7 @@ subj_n <- length(unique(acc_walking_IU$subj_id))
 ## Filter, mutate accelerometry data frame
 acc_f <- 
   acc_walking_IU %>% 
-  filter(loc_id == "left_ankle") %>%
+  filter(loc_id == "left_wrist") %>%
   filter(time_s > 5) %>%
   group_by(subj_id) %>%
   arrange(subj_id, time_s) %>%
@@ -89,10 +88,10 @@ dim(y_train); dim(y_test)
 ## Fit model
 model <- keras_model_sequential() 
 model %>% 
-  layer_conv_1d(filters = 40, kernel_size = 50, 
-                activation = "relu",  
+  layer_conv_1d(filters = 100, kernel_size = 50,  activation = "relu",  
                 input_shape = c(win_vl, 1)) %>%
-  layer_max_pooling_1d(pool_size = 100) %>%  
+  layer_conv_1d(filters = 100, kernel_size = 50,  activation = "relu") %>%
+  layer_max_pooling_1d(pool_size = 200) %>%
   layer_flatten() %>%
   layer_dense(units = subj_n, activation = 'softmax')
 summary(model)
@@ -113,5 +112,87 @@ history <- model %>% fit(
 test_eval <- model %>% evaluate(x_test, y_test)
 plot(history) + labs(title = paste0("Test set accuracy = ", round(test_eval$acc, 3)))
 
-plt.path <- file.path(project.dir, "figures/fit_history_leftankle.jpeg")
+plt.path <- file.path(project.dir, "figures/fit_history_leftwrist.jpeg")
 ggsave(plt.path, width = 22, height = 12, units = "cm")
+
+
+
+## -----------------------------------------------------------------------------
+## Add Dropout
+
+## Fit model2
+model2 <- keras_model_sequential() 
+model2 %>% 
+  layer_conv_1d(filters = 50, kernel_size = 50,  activation = "relu",  
+                input_shape = c(win_vl, 1)) %>%
+  layer_conv_1d(filters = 50, kernel_size = 50,  activation = "relu") %>%
+  layer_max_pooling_1d(pool_size = 200) %>%
+  layer_flatten() %>%
+  layer_dropout(0.35) %>%
+  layer_dense(units = subj_n, activation = 'softmax')
+summary(model2)
+model2 %>% compile(
+  loss = 'categorical_crossentropy',
+  optimizer = optimizer_rmsprop(),
+  metrics = c('accuracy')
+)
+history <- model2 %>% fit(
+  x_train, 
+  y_train, 
+  epochs = 200, 
+  batch_size = 30,   
+  validation_split = 0.3   
+)
+
+
+
+## Evaluate performance on test set
+test_eval <- model2 %>% evaluate(x_test, y_test)
+plot(history) + labs(title = paste0("Test set accuracy = ", round(test_eval$acc, 3)))
+
+plt.path <- file.path(project.dir, "figures/fit_history_leftwrist_2.jpeg")
+ggsave(plt.path, width = 22, height = 12, units = "cm")
+
+
+## Prediction per person
+pred_df <- model2 %>% predict(x_test) %>% as.data.frame()
+colnames(pred_df) <- paste0(1:subj_n) 
+pred_df$subj_id_true <- (Y_all[-train_idx] + 1)
+plt.df <- 
+  pred_df %>% 
+  reshape2::melt(id.vars = c("subj_id_true"), 
+       variable.name = "subj_id_pred",
+       value.name = "pred_prob") %>%
+  mutate(subj_id_pred = as.numeric(as.character(subj_id_pred))) %>%
+  group_by(subj_id_true, subj_id_pred) %>%
+  summarise(subj_id_pred_mean = mean(pred_prob)) %>%
+  mutate(true_pred = as.numeric(subj_id_true == subj_id_pred))
+
+
+ggplot(plt.df, aes(x = factor(subj_id_true), y = subj_id_pred_mean, color = factor(true_pred))) + 
+  geom_point(alpha = 0.8, size = 2) + 
+  labs(x = "Subject ID", y = "Classification probability", color = "Correct\nparticipant\nindicator",
+       title = "Participant classification probability\nbased on 5-sec wrist-worn accelerometry data fragments") + 
+  theme_minimal(base_size = 10) + 
+  scale_color_manual(values = c("black", "red"))
+
+plt.path <- file.path(project.dir, "figures/fit_history_leftwrist_2_class_prob.jpeg")
+ggsave(plt.path, width = 20, height = 16, units = "cm")
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
