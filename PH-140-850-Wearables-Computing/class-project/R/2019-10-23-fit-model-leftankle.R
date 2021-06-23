@@ -89,7 +89,8 @@ dim(y_train); dim(y_test)
 ## Fit model
 model <- keras_model_sequential() 
 model %>% 
-  layer_conv_1d(filters = 40, kernel_size = 50,  activation = "relu",  
+  layer_conv_1d(filters = 40, kernel_size = 50, 
+                activation = "relu",  
                 input_shape = c(win_vl, 1)) %>%
   layer_max_pooling_1d(pool_size = 100) %>%  
   layer_flatten() %>%

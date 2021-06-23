@@ -144,6 +144,8 @@ history <- model2 %>% fit(
   validation_split = 0.3   
 )
 
+
+
 ## Evaluate performance on test set
 test_eval <- model2 %>% evaluate(x_test, y_test)
 plot(history) + labs(title = paste0("Test set accuracy = ", round(test_eval$acc, 3)))
